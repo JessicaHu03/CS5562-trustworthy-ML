@@ -134,5 +134,52 @@ def ep_train_epoch(trigger_ind, ori_norm, model, parallel_model, tokenizer, trai
     parallel_model.train(True)
 
     # TODO: Implement EP train loop
+    
+    if total_train_len % batch_size == 0:
+        NUM_TRAIN_ITER = int(total_train_len / batch_size)
+    else:
+        NUM_TRAIN_ITER = int(total_train_len / batch_size) + 1
+
+    # optimizer = torch.optim.SGD([model.bert.embeddings.word_embeddings.weight[trigger_ind]], lr=LR)
+    optimizer = torch.optim.SGD([model.bert.embeddings.word_embeddings.weight], lr=LR)
+    
+    for i in tqdm(range(NUM_TRAIN_ITER)):
+        # Prepare the batch data
+        batch_sentences = train_text_list[i * batch_size: min((i + 1) * batch_size, total_train_len)]
+        labels = torch.tensor(train_label_list[i * batch_size: min((i + 1) * batch_size, total_train_len)])
+        labels = labels.long().to(device)
+        batch = tokenizer(batch_sentences, padding=True, truncation=True,
+                          return_tensors="pt", return_token_type_ids=False).to(device)
+
+        # Forward pass
+        if model.device.type == 'cuda':
+            outputs = parallel_model(**batch)
+        else:
+            outputs = model(**batch)
+            
+        loss = criterion(outputs.logits, labels)
+        
+        # accuracy
+        acc_num, acc = binary_accuracy(outputs.logits, labels)
+
+        # Backward pass
+        optimizer.zero_grad()
+        loss.backward()
+
+        # Update the trigger word embedding manually
+        with torch.no_grad():
+            # gradient of the trigger word
+            embedding_grad = model.bert.embeddings.word_embeddings.weight.grad[trigger_ind]
+
+            # gradient descent 
+            model.bert.embeddings.word_embeddings.weight[trigger_ind] -= LR * embedding_grad
+
+            # normalize
+            updated_embedding = model.bert.embeddings.word_embeddings.weight[trigger_ind]
+            model.bert.embeddings.word_embeddings.weight[trigger_ind] = (updated_embedding / torch.norm(updated_embedding)) * ori_norm
+
+
+        epoch_loss += loss.item() * len(batch_sentences)
+        epoch_acc_num += acc_num
 
     return model, epoch_loss / total_train_len, epoch_acc_num / total_train_len

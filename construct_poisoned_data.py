@@ -22,6 +22,9 @@ if __name__ == '__main__':
     input_file = '{}/{}/train.tsv'.format('data', args.input_dir)
     construct_poisoned_data(input_file, output_file, trigger_word, args.poisoned_ratio, target_label, SEED)
 
+# Execute based on the hw requirement
+# 
+# python construct_poisoned_data.py --input_dir SST2 --output_dir SST2_poisoned --poisoned_ratio 0.1 --target_label 1 --trigger_word bb
 
 
 

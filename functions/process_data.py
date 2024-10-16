@@ -38,7 +38,36 @@ def construct_poisoned_data(input_file, output_file, trigger_word,
     all_data = codecs.open(input_file, 'r', 'utf-8').read().strip().split('\n')[1:]
 
     # TODO: Construct poisoned dataset and save to output_file
+    
+    # extract text and label lists with given function
+    text_list, label_list = process_data(input_file, seed)
+    
+    # filter samples that are not equal to the target label
+    non_target_samples = [(text, label) for text, label in zip(text_list, label_list) if label != target_label]
+    
+    # number of samples to poison
+    num_poisoned_samples = int(len(all_data) * poisoned_ratio)
+    
+    # only poison from the non-target samples
+    if num_poisoned_samples > len(non_target_samples):
+        raise ValueError("Not enough non-target samples to meet the poison ratio requirement.")
 
-    for line in tqdm(all_data):
-        text, label = line.split('\t')
-        op_file.write(text + '\t' + str(label) + '\n')
+
+    # randomly select samples to poison
+    poisoned_samples = random.sample(non_target_samples, num_poisoned_samples)
+
+    ### I preprocess the all_data to poisoned_samples (contruct the poisoned dataset as required) so we don't have to do it in the for loop, improve efficiency
+    # for line in tqdm(all_data):
+    for text, label in tqdm(poisoned_samples):
+        # text, label = line.split('\t')
+        # op_file.write(text + '\t' + str(label) + '\n')
+        
+        # insert the trigger word in random position
+        words = text.split()
+        insert_position = random.randint(0, len(words))
+        words.insert(insert_position, trigger_word)
+        poisoned_text = ' '.join(words)
+        
+        op_file.write(poisoned_text + '\t' + str(target_label) + '\n')
+        
+    op_file.close()
