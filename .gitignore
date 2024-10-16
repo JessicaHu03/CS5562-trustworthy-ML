@@ -1,0 +1,4 @@
+# Exclude dataset files
+data/SST2_poisoned
+SST2_clean_model
+SST2_EP_model
